@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎨 Colour Prediction Game</title>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Poppins',sans-serif;}
+body{
+  background:radial-gradient(circle at top,#0f172a,#020617);
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  height:100vh;
+  overflow:hidden;
+}
+h1{text-align:center;font-size:1.3em;margin:10px 0;text-shadow:0 0 8px #fff2;}
+.recent-colors{width:100%;overflow-x:hidden;border-bottom:1px solid #222;
+  background:rgba(255,255,255,0.05);padding:10px 0;position:relative;}
+.recent-series{display:flex;flex-direction:row-reverse;gap:10px;padding:0 10px;}
+.circle{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,0.1);
+  box-shadow:0 0 10px rgba(255,255,255,0.2);transition:all 0.3s ease;}
+.circle.red{background:#ef4444;}
+.circle.green{background:#10b981;}
+.circle.new{animation:pulse 0.5s ease 2;}
+.main{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;}
+.timer{font-size:1em;margin:5px;opacity:0.8;}
+.choice{margin:5px 0;font-size:1em;opacity:0.9;}
+.ball-container{position:relative;width:120px;height:120px;margin:10px 0;}
+.ball{width:100%;height:100%;border-radius:50%;display:flex;justify-content:center;
+  align-items:center;font-size:1.6em;transition:all .4s ease;box-shadow:0 0 15px rgba(255,255,255,0.1);
+  position:relative;overflow:hidden;}
+.ball.red{background:#ef4444;box-shadow:0 0 25px #ef444490;}
+.ball.green{background:#10b981;box-shadow:0 0 25px #10b98190;}
+.ball::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
+  background:linear-gradient(45deg,transparent,rgba(255,255,255,0.1),transparent);
+  transform:rotate(45deg);animation:shine 3s infinite linear;}
+.result-text{font-size:1.4em;margin-top:6px;height:28px;font-weight:bold;}
+.balance{font-weight:bold;margin-top:8px;display:flex;align-items:center;gap:5px;}
+.bet-amount-container{display:flex;gap:8px;margin:10px 0;}
+.bet-amount{background:#1e293b;border:2px solid #334155;padding:6px 12px;border-radius:8px;
+  color:white;font-weight:bold;cursor:pointer;transition:all 0.2s ease;}
+.bet-amount.active{background:#2563eb;border-color:#3b82f6;}
+.bet-amount:hover{background:#334155;}
+.add{background:#2563eb;border:none;padding:6px 12px;border-radius:8px;color:white;
+  font-weight:bold;margin-top:8px;cursor:pointer;transition:all 0.2s ease;}
+.add:hover{background:#1d4ed8;transform:translateY(-2px);}
+.btn-bar{display:flex;justify-content:space-around;width:100%;padding:15px 0;
+  background:rgba(255,255,255,0.05);border-top:1px solid #333;}
+.color-btn{width:45%;padding:14px 0;border:none;border-radius:10px;font-size:1.2em;
+  font-weight:bold;color:white;cursor:pointer;transition:transform 0.2s, box-shadow 0.2s;
+  position:relative;overflow:hidden;}
+.color-btn:active{transform:scale(0.95);}
+.color-btn::after{content:'';position:absolute;top:0;left:0;width:100%;height:100%;
+  background:linear-gradient(rgba(255,255,255,0.1),transparent);opacity:0;transition:opacity 0.3s;}
+.color-btn:hover::after{opacity:1;}
+.red{background:#ef4444;box-shadow:0 4px 0 #b91c1c;}
+.green{background:#10b981;box-shadow:0 4px 0 #047857;}
+.popup{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);
+  display:flex;justify-content:center;align-items:center;z-index:100;opacity:0;
+  pointer-events:none;transition:opacity 0.3s ease;}
+.popup.show{opacity:1;pointer-events:all;}
+.popup-content{background:#111;padding:25px;border-radius:15px;text-align:center;
+  box-shadow:0 0 20px rgba(255,255,255,0.15);width:80%;max-width:300px;
+  transform:translateY(20px);transition:transform 0.3s ease;}
+.popup.show .popup-content{transform:translateY(0);}
+.popup-content h2{margin-bottom:10px;}
+.popup-content button{background:#2563eb;border:none;padding:8px 16px;border-radius:8px;
+  color:white;font-weight:bold;margin-top:15px;cursor:pointer;transition:background 0.2s;}
+.popup-content button:hover{background:#1d4ed8;}
+.login-container{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle at top,#0f172a,#020617);
+  display:flex;justify-content:center;align-items:center;z-index:1000;}
+.login-box{background:#111;padding:30px;border-radius:15px;box-shadow:0 0 30px rgba(255,255,255,0.1);
+  width:90%;max-width:400px;text-align:center;}
+.login-box h2{margin-bottom:20px;}
+.login-input{width:100%;padding:12px;margin:10px 0;background:#1e293b;border:1px solid #334155;
+  border-radius:8px;color:white;font-size:1em;}
+.login-btn{width:100%;padding:12px;margin:10px 0;background:#2563eb;border:none;
+  border-radius:8px;color:white;font-weight:bold;cursor:pointer;transition:background 0.2s;}
+.login-btn:hover{background:#1d4ed8;}
+.login-toggle{margin-top:15px;color:#94a3b8;cursor:pointer;}
+.login-toggle:hover{color:#cbd5e1;}
+.user-info{position:absolute;top:10px;left:10px;display:flex;align-items:center;gap:10px;}
+.user-avatar{width:32px;height:32px;border-radius:50%;background:#2563eb;display:flex;
+  align-items:center;justify-content:center;font-weight:bold;}
+.logout-btn{background:transparent;border:1px solid #334155;color:#94a3b8;padding:4px 8px;
+  border-radius:4px;cursor:pointer;font-size:0.8em;}
+.logout-btn:hover{background:#334155;}
+.live-bets{position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.7);padding:8px 12px;
+  border-radius:8px;font-size:0.8em;max-width:200px;}
+.bet-item{display:flex;justify-content:space-between;margin:4px 0;font-size:0.9em;}
+.bet-red{color:#ef4444;}
+.bet-green{color:#10b981;}
+.hidden{display:none;}
+.status-message{padding:10px;margin:10px 0;border-radius:5px;text-align:center;}
+.status-success{background:#10b981;color:white;}
+.status-error{background:#ef4444;color:white;}
+.fund-options{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;justify-content:center;}
+.fund-option{background:#1e293b;border:2px solid #334155;padding:6px 12px;border-radius:8px;
+  color:white;font-weight:bold;cursor:pointer;transition:all 0.2s ease;}
+.fund-option:hover{background:#334155;}
+@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.2);}}
+@keyframes shine{0%{transform:rotate(45deg) translateX(-100%);}
+  100%{transform:rotate(45deg) translateX(100%);}}
+@keyframes countdownPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
+@keyframes resultGlow{0%,100%{filter:brightness(1);}50%{filter:brightness(1.5);}}
+@media(max-width:600px){
+  h1{font-size:1.1em;}
+  .ball-container{width:90px;height:90px;}
+  .color-btn{font-size:1em;padding:12px 0;}
+  .bet-amount-container{flex-wrap:wrap;justify-content:center;}
+  .live-bets{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="loginScreen" class="login-container">
+  <div class="login-box">
+   
+
+    <div id="statusMessage"></div>
+    <div id="loginForm">
+      <input type="email" id="loginEmail" class="login-input" placeholder="Email">
+      <input type="password" id="loginPassword" class="login-input" placeholder="Password">
+      <button class="login-btn" onclick="login()">Login</button>
+      <div class="login-toggle" onclick="toggleLoginMode()">Don't have an account? Sign up</div>
+    </div>
+    <div id="signupForm" class="hidden">
+      <input type="text" id="signupName" class="login-input" placeholder="Full Name">
+      <input type="email" id="signupEmail" class="login-input" placeholder="Email">
+      <input type="password" id="signupPassword" class="login-input" placeholder="Password">
+      <button class="login-btn" onclick="signup()">Sign Up</button>
+      <div class="login-toggle" onclick="toggleLoginMode()">Already have an account? Login</div>
+    </div>
+  </div>
+</div>
+
+<!-- Game Screen -->
+<div id="gameScreen" class="hidden">
+  <div class="user-info">
+    <div class="user-avatar" id="userAvatar">U</div>
+    <div>
+  
+    </div>
+  </div>
+
+  <div class="live-bets" id="liveBets">
+    <div style="margin-bottom:5px;font-weight:bold;">Live Bets</div>
+    <div id="betsList"></div>
+  </div>
+   <h2>         </h2>
+  <h1>    <div id="userName">user</div>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+<div class="balance">🤑<span id="coins">100</span></div></h1>
+
+  <div class="recent-colors">
+    <div class="recent-series" id="recentSeries"></div>
+  </div>
+
+  <div class="main">
+    <div class="timer">⏳ Next Result in <span id="countdown">7</span>s</div>
+    <div class="choice" id="choiceText">No bet yet</div>
+    <div class="ball-container">
+      <div class="ball" id="ball">?</div>
+    </div>
+    <div class="result-text" id="resultText"></div>
+    
+    
+    <div class="bet-amount-container">
+      <div class="bet-amount active" data-amount="5">5</div>
+      <div class="bet-amount" data-amount="10">10</div>
+      <div class="bet-amount" data-amount="20">20</div>
+      <div class="bet-amount" data-amount="50">50</div>
+      <div class="bet-amount" data-amount="100">100</div>
+    </div>
+
+    <div class="fund-options">
+      <div class="fund-option" onclick="addFunds(50)">+50</div>
+      <div class="fund-option" onclick="addFunds(100)">+100</div>
+      <div class="fund-option" onclick="addFunds(500)">+500</div>
+      <div class="fund-option" onclick="addFunds(1000)">+1000</div>
+    </div>
+  </div>
+
+  <div class="btn-bar">
+    <button class="color-btn red" onclick="bet('red')">RED</button>
+    <button class="color-btn green" onclick="bet('green')">GREEN</button>
+  </div>
+</div>
+
+<div id="popup" class="popup">
+  <div class="popup-content">
+    <h2 id="popupTitle"></h2>
+    <p id="popupMsg"></p>
+    <button onclick="closePopup()">OK</button>
+  </div>
+</div>
+
+<script>
+// Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyB5Xc9Fhk10KPihMrlpXV8uE8Z0okogj6g",
+  authDomain: "amit-59d6d.firebaseapp.com",
+  projectId: "amit-59d6d",
+  storageBucket: "amit-59d6d.firebasestorage.app",
+  messagingSenderId: "62767860556",
+  appId: "1:62767860556:web:eb8585ee6147d7e6bb9de9",
+  measurementId: "G-SMSHMTR39E"
+};
+
+// Initialize Firebase
+try {
+  firebase.initializeApp(firebaseConfig);
+  console.log("Firebase initialized successfully");
+} catch (error) {
+  console.error("Firebase initialization error:", error);
+  showStatusMessage("Firebase initialization failed: " + error.message, "error");
+}
+
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// Game Variables
+let coins = 100;
+let countdown = 7;
+let betColor = null;
+let betAmount = 5;
+let history = [];
+let timer;
+let currentSeries = [];
+let currentUser = null;
+let currentRoundId = null;
+let currentPatternIndex = 0;
+let patternPosition = 0;
+
+// All series patterns from your data
+const allPatterns = [
+  // 🟢 🔴 🟢 🔴 🟢 (Alternating starting with green)
+  { name: "Alternate Green", sequence: ["green", "red", "green", "red", "green"] },
+  
+  // 🔴 🔴 🔴 🟢 🟢 🟢 (3 red, 3 green)
+  { name: "3R3G", sequence: ["red", "red", "red", "green", "green", "green"] },
+  
+  // 🟢 🟢 🔴 🔴 (2 green, 2 red)
+  { name: "2G2R", sequence: ["green", "green", "red", "red"] },
+  
+  // 🔴 🔴 🟢 🟢 🔴 🔴 (2 red, 2 green, 2 red)
+  { name: "2R2G2R", sequence: ["red", "red", "green", "green", "red", "red"] },
+  
+  // 🟢 🟢 🟢 🔴 🔴 🔴 (3 green, 3 red)
+  { name: "3G3R", sequence: ["green", "green", "green", "red", "red", "red"] },
+  
+  // 🔴 🔴 🟢 🟢 (2 red, 2 green)
+  { name: "2R2G", sequence: ["red", "red", "green", "green"] },
+  
+  // 🔴 🔴 🟢 🔴 🔴 (2 red, 1 green, 2 red)
+  { name: "2R1G2R", sequence: ["red", "red", "green", "red", "red"] },
+  
+  // 🟢 🟢 🔴 🟢 🟢 (2 green, 1 red, 2 green)
+  { name: "2G1R2G", sequence: ["green", "green", "red", "green", "green"] },
+  
+  // 🟢 🔴 🔴 🔴 🟢 (1 green, 3 red, 1 green)
+  { name: "1G3R1G", sequence: ["green", "red", "red", "red", "green"] },
+  
+  // 🔴 🟢 🟢 🟢 🔴 (1 red, 3 green, 1 red)
+  { name: "1R3G1R", sequence: ["red", "green", "green", "green", "red"] },
+  
+  // 🟢 🔴 🔴 🟢 (1 green, 2 red, 1 green)
+  { name: "1G2R1G", sequence: ["green", "red", "red", "green"] },
+  
+  // 🔴 🟢 🟢 🔴 (1 red, 2 green, 1 red)
+  { name: "1R2G1R", sequence: ["red", "green", "green", "red"] },
+  
+  // 🟢 🟢 🟢 🟢 (4 green)
+  { name: "4G", sequence: ["green", "green", "green", "green"] },
+  
+  // 🔴 🔴 🔴 🔴 (4 red)
+  { name: "4R", sequence: ["red", "red", "red", "red"] },
+  
+  // 🟢 🟢 🟢 🔴 🟢 🟢 🟢 (3 green, 1 red, 3 green)
+  { name: "3G1R3G", sequence: ["green", "green", "green", "red", "green", "green", "green"] },
+  
+  // 🔴 🔴 🔴 🟢 🔴 🔴 🔴 (3 red, 1 green, 3 red)
+  { name: "3R1G3R", sequence: ["red", "red", "red", "green", "red", "red", "red"] }
+];
+
+// Utility Functions
+function showStatusMessage(message, type) {
+  const statusDiv = document.getElementById('statusMessage');
+  statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+  setTimeout(() => {
+    statusDiv.innerHTML = '';
+  }, 5000);
+}
+
+// Authentication Functions
+function toggleLoginMode() {
+  const loginForm = document.getElementById('loginForm');
+  const signupForm = document.getElementById('signupForm');
+  
+  if (loginForm.classList.contains('hidden')) {
+    loginForm.classList.remove('hidden');
+    signupForm.classList.add('hidden');
+  } else {
+    loginForm.classList.add('hidden');
+    signupForm.classList.remove('hidden');
+  }
+}
+
+async function login() {
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  
+  if (!email || !password) {
+    showStatusMessage('Please enter both email and password', 'error');
+    return;
+  }
+  
+  try {
+    showStatusMessage('Logging in...', 'success');
+    const userCredential = await auth.signInWithEmailAndPassword(email, password);
+    currentUser = userCredential.user;
+    showStatusMessage('Login successful!', 'success');
+    showGameScreen();
+    loadUserData();
+  } catch (error) {
+    console.error('Login error:', error);
+    showStatusMessage('Login failed: ' + error.message, 'error');
+  }
+}
+
+async function signup() {
+  const name = document.getElementById('signupName').value;
+  const email = document.getElementById('signupEmail').value;
+  const password = document.getElementById('signupPassword').value;
+  
+  if (!name || !email || !password) {
+    showStatusMessage('Please fill all fields', 'error');
+    return;
+  }
+  
+  try {
+    showStatusMessage('Creating account...', 'success');
+    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+    currentUser = userCredential.user;
+    
+    // Update user profile
+    await currentUser.updateProfile({
+      displayName: name
+    });
+    
+    // Create user document in Firestore
+    await db.collection('users').doc(currentUser.uid).set({
+      name: name,
+      email: email,
+      coins: 100,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    showStatusMessage('Account created successfully!', 'success');
+    showGameScreen();
+    loadUserData();
+  } catch (error) {
+    console.error('Signup error:', error);
+    showStatusMessage('Signup failed: ' + error.message, 'error');
+  }
+}
+
+function logout() {
+  auth.signOut();
+  showLoginScreen();
+}
+
+function showLoginScreen() {
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('gameScreen').classList.add('hidden');
+  currentUser = null;
+}
+
+function showGameScreen() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('gameScreen').classList.remove('hidden');
+  updateUserInfo();
+}
+
+function updateUserInfo() {
+  if (currentUser) {
+    document.getElementById('userName').textContent = currentUser.displayName || currentUser.email.split('@')[0];
+    document.getElementById('userAvatar').textContent = (currentUser.displayName || currentUser.email[0]).toUpperCase();
+  }
+}
+
+async function loadUserData() {
+  if (!currentUser) return;
+  
+  try {
+    const userDoc = await db.collection('users').doc(currentUser.uid).get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      coins = userData.coins || 100;
+      updateCoins();
+    }
+  } catch (error) {
+    console.error('Error loading user data:', error);
+  }
+}
+
+// Game Functions
+function updateCoins() {
+  document.getElementById('coins').textContent = coins;
+  if (currentUser) {
+    db.collection('users').doc(currentUser.uid).update({
+      coins: coins
+    }).catch(error => {
+      console.error('Error updating coins:', error);
+    });
+  }
+}
+
+function addFunds(amount) {
+  coins += amount;
+  updateCoins();
+  showPopup('Funds Added', `Successfully added ${amount} coins to your account!`);
+}
+
+function startRound() {
+  countdown = 7;
+  document.getElementById('countdown').textContent = countdown;
+  document.getElementById('ball').className = 'ball';
+  document.getElementById('ball').textContent = '?';
+  document.getElementById('resultText').textContent = '';
+  document.getElementById('choiceText').textContent = 'Place your bet!';
+  betColor = null;
+
+  // Create new round in Firestore
+  currentRoundId = Date.now().toString();
+  db.collection('rounds').doc(currentRoundId).set({
+    startTime: firebase.firestore.FieldValue.serverTimestamp(),
+    status: 'active',
+    bets: {}
+  }).catch(error => {
+    console.error('Error creating round:', error);
+  });
+
+  timer = setInterval(() => {
+    countdown--;
+    document.getElementById('countdown').textContent = countdown;
+    
+    if(countdown <= 3) {
+      document.getElementById('countdown').style.animation = 'countdownPulse 0.5s infinite';
+    } else {
+      document.getElementById('countdown').style.animation = '';
+    }
+    
+    if(countdown <= 0) {
+      clearInterval(timer);
+      document.getElementById('countdown').style.animation = '';
+      showResult();
+    }
+  }, 1000);
+}
+
+async function bet(color) {
+  if(!currentUser) {
+    showPopup('Login Required', 'Please login to place bets');
+    return;
+  }
+  if(betColor) {
+    showPopup('⚠️ Bet Locked', 'You already placed a bet this round!');
+    return;
+  }
+  if(coins < betAmount) {
+    showPopup('💸 Not Enough Coins', `You need ${betAmount} coins to place this bet!`);
+    return;
+  }
+  
+  coins -= betAmount;
+  updateCoins();
+  betColor = color;
+  document.getElementById('choiceText').textContent = `You bet ${betAmount} on ${color === 'red' ? '🔴 RED' : '🟢 GREEN'}`;
+  
+  // Save bet to Firestore
+  if (currentRoundId) {
+    try {
+      await db.collection('rounds').doc(currentRoundId).update({
+        [`bets.${currentUser.uid}`]: {
+          userName: currentUser.displayName || currentUser.email.split('@')[0],
+          color: color,
+          amount: betAmount,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        }
+      });
+    } catch (error) {
+      console.error('Error saving bet:', error);
+    }
+  }
+  
+  const btn = document.querySelector(`.${color}`);
+  btn.style.transform = 'translateY(4px)';
+  btn.style.boxShadow = '0 0 0 #000';
+  setTimeout(() => {
+    btn.style.transform = '';
+    btn.style.boxShadow = '';
+  }, 200);
+}
+
+function getNextPattern() {
+  // Randomly decide whether to switch pattern (40% chance)
+  if (Math.random() < 0.4) {
+    currentPatternIndex = Math.floor(Math.random() * allPatterns.length);
+    patternPosition = 0;
+    console.log("Switched to pattern:", allPatterns[currentPatternIndex].name);
+  }
+  
+  const pattern = allPatterns[currentPatternIndex];
+  const result = pattern.sequence[patternPosition];
+  
+  // Move to next position in pattern
+  patternPosition = (patternPosition + 1) % pattern.sequence.length;
+  
+  return result;
+}
+
+
+function updateRecentColors() {
+  const recentSeriesElement = document.getElementById('recentSeries');
+  // Show only last 10 colors
+  const recentColors = history.slice(0, 10);
+  recentSeriesElement.innerHTML = recentColors
+    .map((c, i) => `<span class="circle ${c} ${i === 0 ? 'new' : ''}"></span>`).join('');
+}
+
+async function showResult() {
+  // Get result from current pattern
+  const result = getNextPattern();
+  
+  const ball = document.getElementById('ball');
+  ball.className = `ball ${result}`;
+  ball.textContent = '';
+  history.unshift(result);
+  updateRecentColors();
+
+  let msg = '';
+  if(betColor) {
+    const win = (betColor === result);
+    if(win) {
+      const winnings = betAmount * 2;
+      coins += winnings;
+      updateCoins();
+      msg = `🏆 WIN +${winnings} Coins`;
+      document.getElementById('resultText').style.animation = 'resultGlow 0.5s ease 3';
+    } else {
+      msg = `❌ LOSS -${betAmount} Coins`;
+    }
+  } else {
+    msg = '⏰ No Bet';
+  }
+  document.getElementById('resultText').textContent = msg;
+  
+  // Update round result in Firestore
+  if (currentRoundId) {
+    try {
+      await db.collection('rounds').doc(currentRoundId).update({
+        result: result,
+        status: 'completed'
+      });
+    } catch (error) {
+      console.error('Error updating round result:', error);
+    }
+  }
+  
+  setTimeout(() => {
+    document.getElementById('resultText').style.animation = '';
+  }, 1500);
+  setTimeout(startRound, 4000);
+}
+
+// Live Bets Functions
+function setupLiveBetsListener() {
+  db.collection('rounds').where('status', '==', 'active')
+    .onSnapshot((snapshot) => {
+      const betsList = document.getElementById('betsList');
+      betsList.innerHTML = '';
+      
+      let totalRed = 0;
+      let totalGreen = 0;
+      let betCount = 0;
+      
+      snapshot.forEach(doc => {
+        const roundData = doc.data();
+        if (roundData.bets) {
+          Object.values(roundData.bets).forEach(bet => {
+            betCount++;
+            if (bet.color === 'red') {
+              totalRed += bet.amount;
+            } else {
+              totalGreen += bet.amount;
+            }
+            
+            const betItem = document.createElement('div');
+            betItem.className = `bet-item ${bet.color === 'red' ? 'bet-red' : 'bet-green'}`;
+            betItem.innerHTML = `
+              <span>${bet.userName}</span>
+              <span>${bet.amount}</span>
+            `;
+            betsList.appendChild(betItem);
+          });
+        }
+      });
+      
+      if (betCount > 0) {
+        const summary = document.createElement('div');
+        summary.className = 'bet-item';
+        summary.innerHTML = `
+          <span>Total:</span>
+          <span>🔴 ${totalRed} 🟢 ${totalGreen}</span>
+        `;
+        betsList.appendChild(summary);
+      } else {
+        betsList.innerHTML = '<div class="bet-item">No active bets</div>';
+      }
+    }, (error) => {
+      console.error('Live bets error:', error);
+    });
+}
+
+function showPopup(t, m) {
+  document.getElementById('popup').classList.add('show');
+  document.getElementById('popupTitle').textContent = t;
+  document.getElementById('popupMsg').textContent = m;
+}
+
+function closePopup() {
+  document.getElementById('popup').classList.remove('show');
+}
+
+// Initialize bet amount selection
+document.querySelectorAll('.bet-amount').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.bet-amount').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    betAmount = parseInt(this.getAttribute('data-amount'));
+  });
+});
+
+// Auth State Listener
+auth.onAuthStateChanged((user) => {
+  if (user) {
+    currentUser = user;
+    showGameScreen();
+    loadUserData();
+    setupLiveBetsListener();
+    showStatusMessage('Welcome back!', 'success');
+  } else {
+    showLoginScreen();
+  }
+});
+
+// Initialize game with random pattern
+currentPatternIndex = Math.floor(Math.random() * allPatterns.length);
+patternPosition = 0;
+updateCoins();
+startRound();
+
+// Test credentials auto-fill for easier testing
+console.log('Test Credentials: test@test.com / 123456');
+</script>
+</body>
+</html>
