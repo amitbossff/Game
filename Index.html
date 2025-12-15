@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Play Store Review Finder</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f2f2f2;
+  margin: 0;
+  padding: 15px;
+}
+
+.container {
+  max-width: 600px;
+  margin: auto;
+  background: white;
+  padding: 15px;
+  border-radius: 10px;
+}
+
+input, button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  font-size: 16px;
+}
+
+button {
+  background: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 5px;
+}
+
+.review {
+  border-top: 1px solid #ddd;
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.rating {
+  color: #ff9800;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h2>Play Store Reviews (By Date)</h2>
+
+  <input id="link" placeholder="Paste Play Store App Link">
+  <input id="date" type="date">
+
+  <button onclick="loadReviews()">Get Reviews</button>
+
+  <div id="output"></div>
+</div>
+
+<script>
+function loadReviews() {
+  const link = document.getElementById("link").value;
+  const date = document.getElementById("date").value;
+  const out = document.getElementById("output");
+
+  out.innerHTML = "Loading...";
+
+  fetch(`/reviews?link=${encodeURIComponent(link)}&date=${date}`)
+    .then(res => res.json())
+    .then(data => {
+      out.innerHTML = "";
+
+      if (data.length === 0) {
+        out.innerHTML = "<p>No reviews found</p>";
+        return;
+      }
+
+      data.forEach(r => {
+        out.innerHTML += `
+          <div class="review">
+            <b>${r.user}</b>
+            <span class="rating">⭐ ${r.rating}</span><br>
+            <small>${r.date}</small>
+            <p>${r.review}</p>
+          </div>
+        `;
+      });
+    })
+    .catch(() => {
+      out.innerHTML = "Error loading reviews";
+    });
+}
+</script>
+
+</body>
+</html>
